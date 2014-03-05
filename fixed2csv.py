@@ -85,6 +85,21 @@ class Schema(object):
                 data[field_name] = line[start_index:end_index].strip()
             yield data
 
+def lookup_django_field(type_name):
+    type_name = type_name.strip().lower()
+    if type_name in ('integer', 'int', 'smallint', 'tinyint'):
+        return 'IntegerField'
+    elif type_name in ('numeric',):
+        return 'FloatField'
+    elif type_name in ('date',):
+        return 'DateField'
+    elif type_name in ('timestamp', 'datetime',):
+        return 'DateTimeField'
+    elif type_name in ('character varying', 'varchar'):
+        return 'CharField'
+    else:
+        raise NotImplementedError, 'Unknown type: %s' % (type_name,)
+
 if __name__ == '__main__':
     
     import argparse
@@ -95,12 +110,43 @@ if __name__ == '__main__':
     parser.add_argument('--help-field')
     parser.add_argument('--type-field')
     parser.add_argument('--review', action='store_true', default=False)
+    parser.add_argument(
+        '--output-django-fields',
+        action='store_true',
+        default=False,
+        help='Generates code for Django model fields.')
     args = parser.parse_args()
 
     s = Schema(
         fn=args.schema,
         help_field=args.help_field,
         type_field=args.type_field)
+    
+    if args.output_django_fields:
+        # Convert the schema file into the equivalent Django model code.
+        assert s.type_field
+        assert s.help_field
+        print 'class MyModel(models.Model):\n'
+        for schema_line in s.schema:
+            field_name = schema_line[s.field_name_field].strip()
+            type_name = schema_line[s.type_field].strip()
+            help_text = schema_line[s.help_field].strip().replace('"', '\\"')
+            max_length = int(schema_line[s.length_field].strip())
+            field_type = lookup_django_field(type_name)
+            field_args = []
+            field_args.append('blank=True')
+            field_args.append('null=True')
+            field_args.append('editable=False')
+            field_args.append('db_index=True')
+            if field_type in ('CharField',):
+                field_args.append('max_length=%i' % max_length)
+            field_args.append('help_text=_("%s")' % help_text)
+            field_args = '\n        '+(',\n        '.join(field_args))
+            django_field_name = re.sub('[^a-zA-Z0-9_]+', '_', field_name).lower()
+            print '    %s = models.%s(%s)' % (django_field_name, field_type, field_args)
+            print
+        sys.exit(0)
+    
     fout = None
     fieldnames = list(s.fieldnames())
     print>>sys.stderr, 'Counting lines...'
