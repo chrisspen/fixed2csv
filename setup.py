@@ -9,7 +9,8 @@ import fixed2csv
 setup(
     name = "fixed2csv",
     version = fixed2csv.__version__,
-    packages = find_packages(),
+    py_modules=['fixed2csv'],
+    scripts=['fixed2csv.py'],
     author = "Chris Spencer",
     author_email = "chrisspen@gmail.com",
     description = "Converts data files formatted in fixed-width columns to CSV.",
@@ -22,5 +23,4 @@ setup(
         'Programming Language :: Python',
     ],
     zip_safe = False,
-    #install_requires = ['Django>=1.4.0', 'lxml'],
 )
