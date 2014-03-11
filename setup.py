@@ -16,9 +16,10 @@ setup(
     description = "Converts data files formatted in fixed-width columns to CSV.",
     license = "LGPL",
     url = "https://github.com/chrisspen/fixed2csv",
+    #https://pypi.python.org/pypi?%3Aaction=list_classifiers
     classifiers = [
         'Intended Audience :: Developers',
-        'License :: OSI Approved :: LGPL License',
+        'License :: OSI Approved :: GNU General Public License v3 (GPLv3)',
         'Operating System :: OS Independent',
         'Programming Language :: Python',
     ],
