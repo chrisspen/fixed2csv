@@ -9,7 +9,7 @@ from commands import getoutput
 
 import dateutil.parser
 
-VERSION = (0, 2, 0)
+VERSION = (0, 2, 2)
 __version__ = '.'.join(map(str, VERSION))
 
 class Schema(object):
@@ -17,19 +17,21 @@ class Schema(object):
     Represents a fixed-width column file schema, stored as a CSV.
     """
     
-    def __init__(self, fn, field_name_field=None, length_field=None, help_field=None, type_field=None, auto_convert_dates=False, *args, **kwargs):
+    def __init__(self, fn, name_field=None, length_field=None, help_field=None, type_field=None, auto_convert_dates=False, delimiter='', *args, **kwargs):
         self.schema = list(csv.DictReader(open(fn), *args, **kwargs))
         schema_fields = self.schema[0].keys()
         self.auto_convert_dates = auto_convert_dates
         
-        self.field_name_field = field_name_field
-        if self.field_name_field is None:
+        self.delimiter = delimiter
+        
+        self.name_field = name_field
+        if self.name_field is None:
             # Attempt to guess field name.
             name_fields = [_ for _ in schema_fields if 'name' in re.sub('[^a-zA-Z0-9_]+', '_', _.strip().lower())]
             if len(name_fields) != 1:
                 raise Exception, 'No name field specified.'
             else:
-                self.field_name_field = name_fields[0]
+                self.name_field = name_fields[0]
         
         self.length_field = length_field
         if self.length_field is None:
@@ -67,7 +69,7 @@ class Schema(object):
         self.help = {}
         self.types = {}
         for schema_line in self.schema:
-            field_name = schema_line[self.field_name_field].strip()
+            field_name = schema_line[self.name_field].strip()
             length = int(schema_line[self.length_field])
             end_index = start_index + length
             self.mapping.append((field_name, start_index, end_index))
@@ -80,10 +82,12 @@ class Schema(object):
                 elif type_field_value.lower() in ('datetime',):
                     self.datetime_fields.add(field_name.lower())
             start_index += length
+            if self.delimiter:
+                start_index += len(self.delimiter)
     
     def fieldnames(self):
         for schema_line in self.schema:
-            field_name = schema_line[self.field_name_field].strip()
+            field_name = schema_line[self.name_field].strip()
             yield field_name
     
     def open(self, fn, skip_to_line=0):
@@ -91,7 +95,10 @@ class Schema(object):
         Reads a fixed-width file using the schema to interpret and convert
         the lines to dictionaries.
         """
-        fin = open(fn)
+        if isinstance(fn, basestring):
+            fin = open(fn)
+        else:
+            fin = fn
         i = 0
         for line in fin:
             i += 1
@@ -127,13 +134,13 @@ def lookup_django_field(type_name):
     type_name = type_name.strip().lower()
     if type_name in ('integer', 'int', 'smallint', 'tinyint'):
         return 'IntegerField'
-    elif type_name in ('numeric',):
+    elif type_name in ('numeric', 'float'):
         return 'FloatField'
     elif type_name in ('date',):
         return 'DateField'
     elif type_name in ('timestamp', 'datetime',):
         return 'DateTimeField'
-    elif type_name in ('character varying', 'varchar'):
+    elif type_name in ('character varying', 'varchar', 'str'):
         return 'CharField'
     else:
         raise NotImplementedError, 'Unknown type: %s' % (type_name,)
@@ -149,8 +156,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Convert fixed width file to CSV.')
     parser.add_argument('--schema')
     parser.add_argument('--data')
+    parser.add_argument('--name-field')
     parser.add_argument('--help-field')
     parser.add_argument('--type-field')
+    parser.add_argument('--delimiter')
     parser.add_argument('--review', action='store_true', default=False)
     parser.add_argument(
         '--output-django-fields',
@@ -161,8 +170,10 @@ if __name__ == '__main__':
 
     s = Schema(
         fn=args.schema,
+        name_field=args.name_field,
         help_field=args.help_field,
-        type_field=args.type_field)
+        type_field=args.type_field,
+        delimiter=args.delimiter)
     
     if args.output_django_fields:
         # Convert the schema file into the equivalent Django model code.
@@ -170,7 +181,7 @@ if __name__ == '__main__':
         assert s.help_field
         print 'class MyModel(models.Model):\n'
         for schema_line in s.schema:
-            field_name = schema_line[s.field_name_field].strip()
+            field_name = schema_line[s.name_field].strip()
             type_name = schema_line[s.type_field].strip()
             help_text = schema_line[s.help_field].strip().replace('"', '\\"')
             max_length = int(schema_line[s.length_field].strip())
