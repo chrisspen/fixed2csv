@@ -3,13 +3,14 @@ import csv
 import os
 import re
 import sys
+import zipfile
 from datetime import date
-
 from commands import getoutput
 
 import dateutil.parser
+import pytz
 
-VERSION = (0, 2, 2)
+VERSION = (0, 2, 3)
 __version__ = '.'.join(map(str, VERSION))
 
 class Schema(object):
@@ -96,9 +97,15 @@ class Schema(object):
         the lines to dictionaries.
         """
         if isinstance(fn, basestring):
-            fin = open(fn)
+            if zipfile.is_zipfile(fn):
+                # Read data from inside a ZIP archive without extracting it.
+                zf = zipfile.ZipFile(fn, 'r')
+                fin = zf.open(zf.namelist()[0])
+            else:
+                fin = open(fn)
         else:
             fin = fn
+            
         i = 0
         for line in fin:
             i += 1
@@ -121,6 +128,8 @@ class Schema(object):
                     elif key in self.datetime_fields:
                         if data[key].strip():
                             data[key] = dateutil.parser.parse(data[key])
+                            if not data[key].tzinfo:
+                                data[key] = pytz.utc.localize(data[key])
                         else:
                             data[key] = None
                 
@@ -147,7 +156,12 @@ def lookup_django_field(type_name):
 
 def count_lines(filename):
     assert os.path.isfile(filename)
-    return int(getoutput('wc -l "%s"' % filename).split(' ')[0])
+    if zipfile.is_zipfile(filename):
+        zf = zipfile.ZipFile(filename, 'r')
+        name = zf.namelist()[0]
+        return zf.open(name).read().count('\n')
+    else:
+        return int(getoutput('wc -l "%s"' % filename).split(' ')[0])
 
 if __name__ == '__main__':
     

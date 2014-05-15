@@ -23,5 +23,9 @@ setup(
         'Operating System :: OS Independent',
         'Programming Language :: Python',
     ],
+    install_requires = [
+        'pytz>=2013.8',
+        'python-dateutil>=2.2',
+    ],
     zip_safe = False,
 )
