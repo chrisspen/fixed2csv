@@ -1,4 +1,5 @@
 #!/usr/bin/env python
+from __future__ import print_function
 import csv
 import os
 import re
@@ -7,10 +8,13 @@ import zipfile
 from datetime import date
 from commands import getoutput
 
-import dateutil.parser
-import pytz
+try:
+    import dateutil.parser
+    import pytz
+except ImportError as e:
+    print(e, file=sys.stderr)
 
-VERSION = (0, 2, 3)
+VERSION = (0, 2, 4)
 __version__ = '.'.join(map(str, VERSION))
 
 class Schema(object):
@@ -115,9 +119,6 @@ class Schema(object):
             for field_name, start_index, end_index in self.mapping:
                 key = field_name.lower()
                 data[key] = line[start_index:end_index].strip()
-#                print 'auto_convert_dates:',self.auto_convert_dates
-#                print 'self.date_fields:',self.date_fields
-#                print 'self.datetime_fields:',self.datetime_fields
                 if self.auto_convert_dates:
                     if key in self.date_fields:
                         if data[key].strip():
@@ -193,7 +194,7 @@ if __name__ == '__main__':
         # Convert the schema file into the equivalent Django model code.
         assert s.type_field
         assert s.help_field
-        print 'class MyModel(models.Model):\n'
+        print('class MyModel(models.Model):\n')
         for schema_line in s.schema:
             field_name = schema_line[s.name_field].strip()
             type_name = schema_line[s.type_field].strip()
@@ -210,15 +211,15 @@ if __name__ == '__main__':
             field_args.append('help_text=_("%s")' % help_text)
             field_args = '\n        '+(',\n        '.join(field_args))
             django_field_name = re.sub('[^a-zA-Z0-9_]+', '_', field_name).lower()
-            print '    %s = models.%s(%s)' % (django_field_name, field_type, field_args)
-            print
+            print('    %s = models.%s(%s)' % (django_field_name, field_type, field_args))
+            print('\n')
         sys.exit(0)
     
     fout = None
     fieldnames = list(s.fieldnames())
-    print>>sys.stderr, 'Counting lines...'
+    print('Counting lines...', file=sys.stderr)
     total = count_lines(args.data)
-    print>>sys.stderr, '%i total lines.' % total
+    print('%i total lines.' % total, file=sys.stderr)
     i = 0
     for line in s.open(fn=args.data):
         i += 1
